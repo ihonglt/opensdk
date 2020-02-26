@@ -1,0 +1,10 @@
+[Bb]in
+[Ll]ib
+[Dd]ebug
+[Rr]elease
+*.swp
+.svn
+log
+*.vcproj.*.user
+*.ncb
+*.suo
