@@ -1,28 +1,27 @@
 /*
  * libwebsockets - small server side websockets and web server implementation
  *
- * Copyright (C) 2010 - 2019 Andy Green <andy@warmcat.com>
+ * Copyright (C) 2010-2018 Andy Green <andy@warmcat.com>
  *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to
- * deal in the Software without restriction, including without limitation the
- * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
- * sell copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
+ *  This library is free software; you can redistribute it and/or
+ *  modify it under the terms of the GNU Lesser General Public
+ *  License as published by the Free Software Foundation:
+ *  version 2.1 of the License.
  *
- * The above copyright notice and this permission notice shall be included in
- * all copies or substantial portions of the Software.
+ *  This library is distributed in the hope that it will be useful,
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ *  Lesser General Public License for more details.
  *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
- * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
- * IN THE SOFTWARE.
+ *  You should have received a copy of the GNU Lesser General Public
+ *  License along with this library; if not, write to the Free Software
+ *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
+ *  MA  02110-1301  USA
+ *
+ * included from libwebsockets.h
  */
 
-/*! \defgroup genericRSA Generic RSA
+/*! \defgroup generic RSA
  * ## Generic RSA related functions
  *
  * Lws provides generic RSA functions that abstract the ones
@@ -33,56 +32,44 @@
  */
 ///@{
 
-/* include/libwebsockets/lws-jwk.h must be included before this */
-
-enum enum_genrsa_mode {
-	LGRSAM_PKCS1_1_5,
-	LGRSAM_PKCS1_OAEP_PSS,
-
-	LGRSAM_COUNT
+enum enum_jwk_tok {
+	JWK_KEY_E,
+	JWK_KEY_N,
+	JWK_KEY_D,
+	JWK_KEY_P,
+	JWK_KEY_Q,
+	JWK_KEY_DP,
+	JWK_KEY_DQ,
+	JWK_KEY_QI,
+	JWK_KTY, /* also serves as count of real elements */
+	JWK_KEY,
 };
+
+#define LWS_COUNT_RSA_ELEMENTS JWK_KTY
 
 struct lws_genrsa_ctx {
 #if defined(LWS_WITH_MBEDTLS)
 	mbedtls_rsa_context *ctx;
 #else
-	BIGNUM *bn[LWS_GENCRYPTO_RSA_KEYEL_COUNT];
-	EVP_PKEY_CTX *ctx;
+	BIGNUM *bn[LWS_COUNT_RSA_ELEMENTS];
 	RSA *rsa;
 #endif
-	struct lws_context *context;
-	enum enum_genrsa_mode mode;
 };
 
-/** lws_genrsa_public_decrypt_create() - Create RSA public decrypt context
- *
- * \param ctx: your struct lws_genrsa_ctx
- * \param el: struct prepared with key element data
- * \param context: lws_context for RNG
- * \param mode: RSA mode, one of LGRSAM_ constants
- * \param oaep_hashid: the lws genhash id for the hash used in MFG1 hash
- *			used in OAEP mode - normally, SHA1
- *
- * Creates an RSA context with a public key associated with it, formed from
- * the key elements in \p el.
- *
- * Mode LGRSAM_PKCS1_1_5 is in widespread use but has weaknesses.  It's
- * recommended to use LGRSAM_PKCS1_OAEP_PSS for new implementations.
- *
- * Returns 0 for OK or nonzero for error.
- *
- * This and related APIs operate identically with OpenSSL or mbedTLS backends.
- */
-LWS_VISIBLE LWS_EXTERN int
-lws_genrsa_create(struct lws_genrsa_ctx *ctx, struct lws_gencrypto_keyelem *el,
-		  struct lws_context *context, enum enum_genrsa_mode mode,
-		  enum lws_genhash_types oaep_hashid);
+struct lws_genrsa_element {
+	uint8_t *buf;
+	uint16_t len;
+};
 
-/** lws_genrsa_destroy_elements() - Free allocations in genrsa_elements
+struct lws_genrsa_elements {
+	struct lws_genrsa_element e[LWS_COUNT_RSA_ELEMENTS];
+};
+
+/** lws_jwk_destroy_genrsa_elements() - Free allocations in genrsa_elements
  *
- * \param el: your struct lws_gencrypto_keyelem
+ * \param el: your struct lws_genrsa_elements
  *
- * This is a helper for user code making use of struct lws_gencrypto_keyelem
+ * This is a helper for user code making use of struct lws_genrsa_elements
  * where the elements are allocated on the heap, it frees any non-NULL
  * buf element and sets the buf to NULL.
  *
@@ -90,13 +77,27 @@ lws_genrsa_create(struct lws_genrsa_ctx *ctx, struct lws_gencrypto_keyelem *el,
  * creation and destruction themselves.
  */
 LWS_VISIBLE LWS_EXTERN void
-lws_genrsa_destroy_elements(struct lws_gencrypto_keyelem *el);
+lws_jwk_destroy_genrsa_elements(struct lws_genrsa_elements *el);
+
+/** lws_genrsa_public_decrypt_create() - Create RSA public decrypt context
+ *
+ * \param ctx: your struct lws_genrsa_ctx
+ * \param el: struct prepared with key element data
+ *
+ * Creates an RSA context with a public key associated with it, formed from
+ * the key elements in \p el.
+ *
+ * Returns 0 for OK or nonzero for error.
+ *
+ * This and related APIs operate identically with OpenSSL or mbedTLS backends.
+ */
+LWS_VISIBLE LWS_EXTERN int
+lws_genrsa_create(struct lws_genrsa_ctx *ctx, struct lws_genrsa_elements *el);
 
 /** lws_genrsa_new_keypair() - Create new RSA keypair
  *
  * \param context: your struct lws_context (may be used for RNG)
  * \param ctx: your struct lws_genrsa_ctx
- * \param mode: RSA mode, one of LGRSAM_ constants
  * \param el: struct to get the new key element data allocated into it
  * \param bits: key size, eg, 4096
  *
@@ -105,51 +106,13 @@ lws_genrsa_destroy_elements(struct lws_gencrypto_keyelem *el);
  *
  * Returns 0 for OK or nonzero for error.
  *
- * Mode LGRSAM_PKCS1_1_5 is in widespread use but has weaknesses.  It's
- * recommended to use LGRSAM_PKCS1_OAEP_PSS for new implementations.
- *
  * This and related APIs operate identically with OpenSSL or mbedTLS backends.
  */
 LWS_VISIBLE LWS_EXTERN int
 lws_genrsa_new_keypair(struct lws_context *context, struct lws_genrsa_ctx *ctx,
-		       enum enum_genrsa_mode mode, struct lws_gencrypto_keyelem *el,
-		       int bits);
+		       struct lws_genrsa_elements *el, int bits);
 
-/** lws_genrsa_public_encrypt() - Perform RSA public key encryption
- *
- * \param ctx: your struct lws_genrsa_ctx
- * \param in: plaintext input
- * \param in_len: length of plaintext input
- * \param out: encrypted output
- *
- * Performs PKCS1 v1.5 Encryption
- *
- * Returns <0 for error, or length of decrypted data.
- *
- * This and related APIs operate identically with OpenSSL or mbedTLS backends.
- */
-LWS_VISIBLE LWS_EXTERN int
-lws_genrsa_public_encrypt(struct lws_genrsa_ctx *ctx, const uint8_t *in,
-			  size_t in_len, uint8_t *out);
-
-/** lws_genrsa_private_encrypt() - Perform RSA private key encryption
- *
- * \param ctx: your struct lws_genrsa_ctx
- * \param in: plaintext input
- * \param in_len: length of plaintext input
- * \param out: encrypted output
- *
- * Performs PKCS1 v1.5 Encryption
- *
- * Returns <0 for error, or length of decrypted data.
- *
- * This and related APIs operate identically with OpenSSL or mbedTLS backends.
- */
-LWS_VISIBLE LWS_EXTERN int
-lws_genrsa_private_encrypt(struct lws_genrsa_ctx *ctx, const uint8_t *in,
-			   size_t in_len, uint8_t *out);
-
-/** lws_genrsa_public_decrypt() - Perform RSA public key decryption
+/** lws_genrsa_public_decrypt() - Perform RSA public decryption
  *
  * \param ctx: your struct lws_genrsa_ctx
  * \param in: encrypted input
@@ -157,7 +120,7 @@ lws_genrsa_private_encrypt(struct lws_genrsa_ctx *ctx, const uint8_t *in,
  * \param out: decrypted output
  * \param out_max: size of output buffer
  *
- * Performs PKCS1 v1.5 Decryption
+ * Performs the decryption.
  *
  * Returns <0 for error, or length of decrypted data.
  *
@@ -167,66 +130,39 @@ LWS_VISIBLE LWS_EXTERN int
 lws_genrsa_public_decrypt(struct lws_genrsa_ctx *ctx, const uint8_t *in,
 			  size_t in_len, uint8_t *out, size_t out_max);
 
-/** lws_genrsa_private_decrypt() - Perform RSA private key decryption
+/** lws_genrsa_public_verify() - Perform RSA public verification
  *
  * \param ctx: your struct lws_genrsa_ctx
- * \param in: encrypted input
- * \param in_len: length of encrypted input
- * \param out: decrypted output
- * \param out_max: size of output buffer
- *
- * Performs PKCS1 v1.5 Decryption
- *
- * Returns <0 for error, or length of decrypted data.
- *
- * This and related APIs operate identically with OpenSSL or mbedTLS backends.
- */
-LWS_VISIBLE LWS_EXTERN int
-lws_genrsa_private_decrypt(struct lws_genrsa_ctx *ctx, const uint8_t *in,
-			   size_t in_len, uint8_t *out, size_t out_max);
-
-/** lws_genrsa_hash_sig_verify() - Verifies RSA signature on a given hash
- *
- * \param ctx: your struct lws_genrsa_ctx
- * \param in: input to be hashed
+ * \param in: unencrypted payload (usually a recomputed hash)
  * \param hash_type: one of LWS_GENHASH_TYPE_
  * \param sig: pointer to the signature we received with the payload
  * \param sig_len: length of the signature we are checking in bytes
  *
  * Returns <0 for error, or 0 if signature matches the payload + key.
  *
- * This just looks at a hash... that's why there's no input length
- * parameter, it's decided by the choice of hash.   It's up to you to confirm
- * separately the actual payload matches the hash that was confirmed by this to
- * be validly signed.
- *
  * This and related APIs operate identically with OpenSSL or mbedTLS backends.
  */
 LWS_VISIBLE LWS_EXTERN int
-lws_genrsa_hash_sig_verify(struct lws_genrsa_ctx *ctx, const uint8_t *in,
-			   enum lws_genhash_types hash_type,
-			   const uint8_t *sig, size_t sig_len);
+lws_genrsa_public_verify(struct lws_genrsa_ctx *ctx, const uint8_t *in,
+			 enum lws_genhash_types hash_type,
+			 const uint8_t *sig, size_t sig_len);
 
-/** lws_genrsa_hash_sign() - Creates an ECDSA signature for a hash you provide
+/** lws_genrsa_public_sign() - Create RSA signature
  *
  * \param ctx: your struct lws_genrsa_ctx
- * \param in: input to be hashed and signed
+ * \param in: precomputed hash
  * \param hash_type: one of LWS_GENHASH_TYPE_
  * \param sig: pointer to buffer to take signature
  * \param sig_len: length of the buffer (must be >= length of key N)
  *
  * Returns <0 for error, or 0 for success.
  *
- * This creates an RSA signature for a hash you already computed and provide.
- * You should have created the hash before calling this by iterating over the
- * actual payload you need to confirm.
- *
  * This and related APIs operate identically with OpenSSL or mbedTLS backends.
  */
 LWS_VISIBLE LWS_EXTERN int
-lws_genrsa_hash_sign(struct lws_genrsa_ctx *ctx, const uint8_t *in,
-		     enum lws_genhash_types hash_type,
-		     uint8_t *sig, size_t sig_len);
+lws_genrsa_public_sign(struct lws_genrsa_ctx *ctx, const uint8_t *in,
+		       enum lws_genhash_types hash_type, uint8_t *sig,
+		       size_t sig_len);
 
 /** lws_genrsa_public_decrypt_destroy() - Destroy RSA public decrypt context
  *

@@ -1,25 +1,24 @@
 /*
  * libwebsockets - small server side websockets and web server implementation
  *
- * Copyright (C) 2010 - 2019 Andy Green <andy@warmcat.com>
+ * Copyright (C) 2010-2018 Andy Green <andy@warmcat.com>
  *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to
- * deal in the Software without restriction, including without limitation the
- * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
- * sell copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
+ *  This library is free software; you can redistribute it and/or
+ *  modify it under the terms of the GNU Lesser General Public
+ *  License as published by the Free Software Foundation:
+ *  version 2.1 of the License.
  *
- * The above copyright notice and this permission notice shall be included in
- * all copies or substantial portions of the Software.
+ *  This library is distributed in the hope that it will be useful,
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ *  Lesser General Public License for more details.
  *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
- * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
- * IN THE SOFTWARE.
+ *  You should have received a copy of the GNU Lesser General Public
+ *  License along with this library; if not, write to the Free Software
+ *  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
+ *  MA  02110-1301  USA
+ *
+ * included from libwebsockets.h
  */
 
 /*! \defgroup sending-data Sending data
@@ -124,7 +123,6 @@ struct lws_write_passthru {
 
 /**
  * lws_write() - Apply protocol then write data to client
- *
  * \param wsi:	Websocket instance (available from user callback)
  * \param buf:	The data to send.  For data being sent on a websocket
  *		connection (ie, not default http), this buffer MUST have
@@ -218,17 +216,7 @@ lws_write(struct lws *wsi, unsigned char *buf, size_t len,
 #define lws_write_http(wsi, buf, len) \
 	lws_write(wsi, (unsigned char *)(buf), len, LWS_WRITE_HTTP)
 
-/**
- * lws_write_ws_flags() - Helper for multi-frame ws message flags
- *
- * \param initial: the lws_write flag to use for the start fragment, eg,
- *		   LWS_WRITE_TEXT
- * \param is_start: nonzero if this is the first fragment of the message
- * \param is_end: nonzero if this is the last fragment of the message
- *
- * Returns the correct LWS_WRITE_ flag to use for each fragment of a message
- * in turn.
- */
+/* helper for multi-frame ws message flags */
 static LWS_INLINE int
 lws_write_ws_flags(int initial, int is_start, int is_end)
 {
@@ -244,21 +232,4 @@ lws_write_ws_flags(int initial, int is_start, int is_end)
 
 	return r;
 }
-
-/**
- * lws_raw_transaction_completed() - Helper for flushing before close
- *
- * \param wsi: the struct lws to operate on
- *
- * Returns -1 if the wsi can close now.  However if there is buffered, unsent
- * data, the wsi is marked as to be closed when the output buffer data is
- * drained, and it returns 0.
- *
- * For raw cases where the transaction completed without failure,
- * `return lws_raw_transaction_completed(wsi)` should better be used than
- * return -1.
- */
-LWS_VISIBLE LWS_EXTERN int LWS_WARN_UNUSED_RESULT
-lws_raw_transaction_completed(struct lws *wsi);
-
 ///@}
